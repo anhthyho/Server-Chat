@@ -1,4 +1,5 @@
 import sys
+import threading
 
 import click
 import socket
@@ -8,61 +9,63 @@ import time
 from pip._vendor.distlib.compat import raw_input
 
 
-class ClientThread (Thread):
-
-    def __init__(self, sd):
-        self.sd = sd
-
-    def run(self):
-        name = ""
-        clients.add(self)
-        while True:
-            try:
-                data = self.sd.recv(1024)
-                if not data:
-                    break
-                dstring = data.decode()
-                if dstring[:6] == 'alive:':
-                    print("received alive msg")
-                    data = "alive"
-                    broadcast(data.encode())
-                elif dstring[6: 16] == 'whoisthere':
-                    for name in names:
-                        data = "present: " + name + "\n"
-                        broadcast(data.encode())
-
-                elif (dstring[:4] != 'mess') & (len(name) == 0):
-                    name = dstring.split('\n', 1)[0]
-                    names.append(name)
-
-                    print(name + " has joined serverside")
-
-                    data = "joined: " + name
-                    broadcast(data.encode())
-                else:
-                    #print("mess-" + name + ":" + dstring[5:])
-
-                    data = "mess-" + name + ":" + dstring[5:]
-                    broadcast(data.encode())
-            except ConnectionResetError:
-                data = ("left: " + name)
-                print(data)
-                broadcast(data.encode())
+def run(self):
+    name = ""
+    clients.add(self)
+    while True:
+        try:
+            data = self.recv(1024)
+            if not data:
                 break
-        self.sd.close()
-        clients.remove(self)
+            dstring = data.decode()
+            if dstring[:5] == 'alive':
+                print("received alive msg")
+                data = name + " is alive"
+                broadcast(data.encode())
+            elif dstring[0:10] == 'whoisthere':
+                for name in names:
+                    data = "present: " + name + "\n"
+                    broadcast(data.encode())
 
-    def send(self, data):
-        self.sd.sendall(data)
+            elif (dstring[:4] != 'mess') & (len(name) == 0):
+                name = dstring.split('\n', 1)[0]
+                names.append(name)
+
+                print(name + " has joined serverside")
+
+                data = "joined: " + name + "\n"
+                broadcast(data.encode())
+            elif (dstring[:4] == 'quit'):
+                clients.remove(self)
+                names.remove(name)
+                data =  name + " has left the chat"
+                broadcast(data.encode())
+            else:
+                data = "mess-" + name + ":" + dstring
+                broadcast(data.encode())
+        except ConnectionResetError:
+            data = ("left: " + name)
+            print(data)
+            broadcast(data.encode())
+            break
+    self.sd.close()
+    clients.remove(self)
+
+
+def send(self, data):
+    self.sd.sendall(data)
+
 
 names = []
 clients = set()
+
+
 def broadcast(data):
     for client in clients:
         client.send(data)
 
-def keep_alive(sock):
 
+def keep_alive(sock):
     for client in clients:
         data = 'are you there?'
         client.send(data.encode())
@@ -81,10 +84,12 @@ def do_server(port):
         while True:
             try:
                 (sd, addr) = ld.accept()
-                keep_alive(ld)
-                ct = ClientThread(sd)
-                clients.add(ct)
-                ct.run()
+                ct = threading.Thread(target=run, args=(sd,))
+                ct.daemon = True
+                ct.start()
+
+                print("connected at: " + str(addr[0]) + " : " + str(addr[1]))
+
             except ConnectionResetError:
                 ("gone!")
         sd.close()
