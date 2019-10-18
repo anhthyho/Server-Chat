@@ -84,6 +84,7 @@ def do_server(port):
         while True:
             try:
                 (sd, addr) = ld.accept()
+                #Fotis helped with the multithreading - target and daemon
                 ct = threading.Thread(target=run, args=(sd,))
                 ct.daemon = True
                 ct.start()
