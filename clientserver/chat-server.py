@@ -55,7 +55,7 @@ class ClientThread (Thread):
     def send(self, data):
         self.sd.sendall(data)
 
-names = set()
+names = []
 clients = set()
 def broadcast(data):
     for client in clients:
