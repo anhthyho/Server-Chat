@@ -40,6 +40,7 @@ def run(self):
                 names.remove(name)
                 data =  name + " has left the chat"
                 broadcast(data.encode())
+                self.end()
             else:
                 data = "mess-" + name + ":" + dstring
                 broadcast(data.encode())
@@ -93,6 +94,7 @@ def do_server(port):
 
             except ConnectionResetError:
                 ("gone!")
+                ld.close()
         sd.close()
 
 
